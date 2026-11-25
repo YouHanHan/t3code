@@ -65,11 +65,11 @@ describe("DesktopEnvironment", () => {
       const packagedWindows = { platform: "win32", isPackaged: true } as const;
       const upstream = yield* makeEnvironment(packagedWindows);
       const fork = yield* makeEnvironment(
-        { ...packagedWindows, appVersion: "0.1.12-youhanhan.1" },
+        { ...packagedWindows, appVersion: "0.1.12-codeskiff.1" },
         { T3CODE_DESKTOP_APP_USER_MODEL_ID: "com.t3tools.t3code" },
       );
 
-      assert.equal(fork.displayName, "YouHanHan Code");
+      assert.equal(fork.displayName, "码舟");
       assert.equal(fork.appUserModelId, "io.github.youhanhan.code");
       assert.equal(fork.appDataDirectory, upstream.appDataDirectory);
       assert.equal(fork.baseDir, upstream.baseDir);

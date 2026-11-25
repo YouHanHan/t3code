@@ -189,9 +189,9 @@ describe("DesktopAppIdentity", () => {
       environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
     },
     {
-      name: "YouHanHan Code",
-      displayName: "YouHanHan Code",
-      environment: { appVersion: "0.1.12-youhanhan.1", platform: "win32" as const },
+      name: "码舟",
+      displayName: "码舟",
+      environment: { appVersion: "0.1.12-codeskiff.1", platform: "win32" as const },
     },
   ])(
     "uses a valid native User-Agent product name for $name",

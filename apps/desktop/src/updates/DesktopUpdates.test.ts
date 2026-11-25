@@ -140,7 +140,7 @@ describe("DesktopUpdates", () => {
   });
 
   it.effect("keeps the fork disabled even when an updater feed is configured", () => {
-    const harness = makeHarness({ platform: "win32", appVersion: "0.1.12-youhanhan.1" });
+    const harness = makeHarness({ platform: "win32", appVersion: "0.1.12-codeskiff.1" });
 
     return Effect.scoped(
       Effect.gen(function* () {

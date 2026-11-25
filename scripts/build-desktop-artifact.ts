@@ -28,7 +28,6 @@ import {
   YOUHANHAN_CODE_APP_ID,
   YOUHANHAN_CODE_ARTIFACT_PREFIX,
   YOUHANHAN_CODE_DESCRIPTION,
-  YOUHANHAN_CODE_NAME,
   YOUHANHAN_CODE_PUBLISHER,
   YOUHANHAN_CODE_REPOSITORY_URL,
 } from "../packages/shared/src/youHanHanBrand.ts";
@@ -2816,7 +2815,7 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
-  if (isYouHanHanCodeVersion(version)) return YOUHANHAN_CODE_NAME;
+  if (isYouHanHanCodeVersion(version)) return YOUHANHAN_CODE_ARTIFACT_PREFIX;
   return resolveDesktopUpdateChannel(version) === "nightly"
     ? "T3 Code (Nightly)"
     : (desktopPackageJson.productName ?? "T3 Code");
