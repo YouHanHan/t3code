@@ -1010,10 +1010,12 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
       Effect.withSpan("clientRuntime.managedRelay.connectEnvironment"),
       withRelayClientTracing,
     ),
-    registerDevice: () =>
-      Effect.fail(
-        new ManagedRelayRequestFailedError({ action: "register relay mobile device", cause: null }),
-      ),
+    registerDevice: Effect.fnUntraced(function* () {
+      return yield* new ManagedRelayRequestFailedError({
+        action: "register relay mobile device",
+        cause: null,
+      });
+    }),
     unregisterDevice: Effect.fnUntraced(
       function* (input) {
         return yield* mobileRegistrationRequest(
@@ -1057,10 +1059,12 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
       Effect.withSpan("clientRuntime.managedRelay.getAgentActivitySnapshot"),
       withRelayClientTracing,
     ),
-    registerLiveActivity: () =>
-      Effect.fail(
-        new ManagedRelayRequestFailedError({ action: "register relay live activity", cause: null }),
-      ),
+    registerLiveActivity: Effect.fnUntraced(function* () {
+      return yield* new ManagedRelayRequestFailedError({
+        action: "register relay live activity",
+        cause: null,
+      });
+    }),
     resetTokenCache: SynchronizedRef.set(cachedTokens, []).pipe(
       Effect.andThen(options.accessTokenStore ? options.accessTokenStore.clear : Effect.void),
       Effect.withSpan("clientRuntime.managedRelay.resetTokenCache"),

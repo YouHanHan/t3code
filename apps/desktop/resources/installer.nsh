@@ -1,3 +1,4 @@
+!if "${APP_ID}" != "io.github.youhanhan.code"
 !include "StrFunc.nsh"
 !ifdef BUILD_UNINSTALLER
   ${UnStrRep}
@@ -7,7 +8,6 @@
   !define T3StrRep '${StrRep}'
 !endif
 
-!if "${APP_ID}" != "io.github.youhanhan.code"
 !macro customAppRunningMessages
   Push $0
   Push $1
