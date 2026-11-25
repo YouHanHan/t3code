@@ -39,13 +39,10 @@ import {
   CLOUD_ENDPOINT_RUNTIME_CONFIG,
   CLOUD_LINK_REVOKED,
   CLOUD_LINKED_USER_ID,
-  isAgentActivityPublishingEnabledValue,
-  PUBLISH_AGENT_ACTIVITY_SECRET,
   RELAY_ENVIRONMENT_CREDENTIAL_SECRET,
   RELAY_URL_SECRET,
 } from "../cloud/config.ts";
 import { relayUrlConfig } from "../cloud/publicConfig.ts";
-import * as RelayTracing from "../cloud/relayTracing.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ExternalLauncher from "../process/externalLauncher.ts";
@@ -65,6 +62,15 @@ const jsonFlag = Flag.Boolean("json").pipe(
 );
 
 const isCloudCliTokenManagerError = Schema.is(CliTokenManager.CloudCliTokenManagerError);
+
+class AgentActivityPublishingDisabledError extends Schema.TaggedError<AgentActivityPublishingDisabledError>()(
+  "AgentActivityPublishingDisabledError",
+  {},
+) {
+  override get message() {
+    return "Agent activity publishing is disabled in this build.";
+  }
+}
 
 export const headlessFlag = Flag.Boolean("headless").pipe(
   Flag.withDescription(
@@ -141,10 +147,6 @@ function bytesToString(value: Uint8Array): string {
   return new TextDecoder().decode(value);
 }
 
-function stringToBytes(value: string): Uint8Array {
-  return new TextEncoder().encode(value);
-}
-
 interface CloudCliStatus {
   readonly desired: boolean;
   readonly authenticated: boolean;
@@ -211,13 +213,11 @@ function formatCloudStatus(
           ? `Run \`${commands.link}\` to link this environment again.`
           : !status.desired
             ? `Run \`${commands.link}\` to enable T3 Connect.`
-            : publishOnly
-              ? "Start T3 to provision the environment link."
-              : "Start T3 to provision the environment link and launch its managed tunnel.";
+            : "Start T3 to provision the environment link and launch its managed tunnel.";
 
   return [
     "T3 Connect",
-    `  Exposure: ${publishOnly ? "publish-only" : status.desired ? "enabled" : "disabled"}`,
+    `  Exposure: ${!publishOnly && status.desired ? "enabled" : "disabled"}`,
     `  Authorization: ${status.authenticated ? "stored credential" : "missing"}`,
     `  Environment link: ${provisioned}`,
     `  Relay: ${status.relayUrl ?? "not provisioned"}`,
@@ -226,10 +226,7 @@ function formatCloudStatus(
     ...(!status.desired
       ? []
       : publishOnly
-        ? [
-            "",
-            "This link only publishes agent activity. Remote access through T3 Connect is off, so other devices need their own route to this machine, such as LAN or Tailscale.",
-          ]
+        ? ["", "This environment has a legacy activity-only link. Activity publishing is disabled."]
         : status.reachability === null
           ? [
               "",
@@ -241,7 +238,7 @@ function formatCloudStatus(
                 `✓ Other devices can reach this machine · ${formatConnectReachable(status.reachability)}`,
               ]
             : ["", formatReachabilityFailure(status.reachability)]),
-    ...(nextStep ? ["", `Next: ${nextStep}`] : []),
+    ...(nextStep && !publishOnly ? ["", `Next: ${nextStep}`] : []),
   ].join("\n");
 }
 
@@ -548,7 +545,6 @@ export const runCloudCommand = Effect.fn("cloud.cli.run_cloud_command")(function
     RelayClient.layerCloudflared({ baseDir: config.baseDir }),
     EnvironmentAuth.layerRuntime,
     CliService.layer(config),
-    RelayTracing.layerHeadlessRelayClient.pipe(Layer.provide(ManagedPolicy.layer)),
   ).pipe(
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(ServerConfig.layer(config)),
@@ -573,40 +569,32 @@ function formatRelayClientReady(version: string): string {
 
 const linkEnvironmentForConnect = Effect.fn("cloud.cli.link_environment")(function* (options: {
   readonly headless: boolean;
-  readonly publishOnly?: boolean;
   /** For `t3 up`, where the user already chose T3 Connect: install it quietly, without asking. */
   readonly installRelayClient?: boolean;
 }) {
-  const publishOnly = options.publishOnly ?? false;
-  if (!publishOnly) {
-    const relayClient = yield* RelayClient.RelayClient;
-    const installed = yield* acquireRelayClientForLink(
-      relayClient,
-      options.installRelayClient === true ? () => Effect.succeed(true) : confirmRelayClientInstall,
-      options.installRelayClient === true
-        ? (event) =>
-            event.type === "progress" && event.stage === "downloading"
-              ? Console.log("Installing the T3 Connect relay client...")
-              : Effect.void
-        : reportRelayClientInstallProgress,
-    );
-    if (Option.isNone(installed)) {
-      yield* Console.log("T3 Connect setup cancelled. The relay client was not installed.");
-      return null;
-    }
-    if (options.installRelayClient !== true) {
-      yield* Console.log(formatRelayClientReady(installed.value.version));
-    }
+  const relayClient = yield* RelayClient.RelayClient;
+  const installed = yield* acquireRelayClientForLink(
+    relayClient,
+    options.installRelayClient === true ? () => Effect.succeed(true) : confirmRelayClientInstall,
+    options.installRelayClient === true
+      ? (event) =>
+          event.type === "progress" && event.stage === "downloading"
+            ? Console.log("Installing the T3 Connect relay client...")
+            : Effect.void
+      : reportRelayClientInstallProgress,
+  );
+  if (Option.isNone(installed)) {
+    yield* Console.log("T3 Connect setup cancelled. The relay client was not installed.");
+    return null;
+  }
+  if (options.installRelayClient !== true) {
+    yield* Console.log(formatRelayClientReady(installed.value.version));
   }
 
   const identity = yield* authorizeCli(options);
-  yield* CliState.setCliDesiredCloudLink(true, publishOnly ? "publish_only" : "managed");
+  yield* CliState.setCliDesiredCloudLink(true);
   if (yield* CliState.dropRevokedCloudLink) {
     yield* Console.log("Replacing the link T3 Connect revoked.");
-  }
-  if (publishOnly) {
-    const secrets = yield* ServerSecretStore.ServerSecretStore;
-    yield* secrets.set(PUBLISH_AGENT_ACTIVITY_SECRET, stringToBytes("true"));
   }
   return { identity } as const;
 });
@@ -634,30 +622,28 @@ const connectLinkCommand = Command.make("link", {
   ...projectLocationFlags,
   headless: headlessFlag,
   publishOnly: Flag.Boolean("publish-only").pipe(
-    Flag.withDescription(
-      "Link to publish agent activity only, with no managed tunnel. Reach this environment out of band (e.g. Tailscale).",
-    ),
+    Flag.withDescription("Legacy option. Agent activity publishing is disabled."),
     Flag.withDefault(false),
   ),
 }).pipe(
   Command.withDescription("Authorize this environment for T3 Connect on next start."),
   Command.withHandler((flags) =>
-    runCloudCommand(
-      flags,
-      Effect.gen(function* () {
-        yield* requireConnectAllowed;
-        yield* Console.log("T3 Connect\n");
-        const linked = yield* linkEnvironmentForConnect(flags);
-        if (linked) {
-          const serveCommand = yield* resolveHostCliHint("serve", flags.baseDir);
-          yield* Console.log(
-            flags.publishOnly
-              ? `✓ Authorized${connectedAs(linked.identity)}\n\nNext\n  Start T3 to publish agent activity (no managed tunnel).`
-              : `✓ Authorized${connectedAs(linked.identity)}\n\nNext\n  Start the server with \`${serveCommand}\` to make this machine reachable.`,
-          );
-        }
-      }),
-    ),
+    flags.publishOnly
+      ? Effect.fail(new AgentActivityPublishingDisabledError())
+      : runCloudCommand(
+          flags,
+          Effect.gen(function* () {
+            yield* requireConnectAllowed;
+            yield* Console.log("T3 Connect\n");
+            const linked = yield* linkEnvironmentForConnect(flags);
+            if (linked) {
+              const serveCommand = yield* resolveHostCliHint("serve", flags.baseDir);
+              yield* Console.log(
+                `✓ Authorized${connectedAs(linked.identity)}\n\nNext\n  Start the server with \`${serveCommand}\` to make this machine reachable.`,
+              );
+            }
+          }),
+        ),
   ),
 );
 
@@ -682,7 +668,6 @@ const connectStatusCommand = Command.make("status", {
           relayCredential,
           cloudUserId,
           relayUrl,
-          publishAgentActivity,
           revoked,
           executable,
           linkMode,
@@ -694,7 +679,6 @@ const connectStatusCommand = Command.make("status", {
             secrets.get(RELAY_ENVIRONMENT_CREDENTIAL_SECRET),
             secrets.get(CLOUD_LINKED_USER_ID),
             secrets.get(RELAY_URL_SECRET),
-            secrets.get(PUBLISH_AGENT_ACTIVITY_SECRET),
             secrets.get(CLOUD_LINK_REVOKED),
             relayClient.resolve,
             CliState.readCliDesiredLinkMode,
@@ -715,9 +699,7 @@ const connectStatusCommand = Command.make("status", {
           revoked: Option.isSome(cloudUserId) && Option.isSome(revoked),
           cloudUserId: Option.isSome(cloudUserId) ? bytesToString(cloudUserId.value) : null,
           relayUrl: Option.isSome(relayUrl) ? bytesToString(relayUrl.value) : null,
-          publishAgentActivity: isAgentActivityPublishingEnabledValue(
-            Option.isSome(publishAgentActivity) ? bytesToString(publishAgentActivity.value) : null,
-          ),
+          publishAgentActivity: false,
           relayClient: executable,
           linkMode,
           reachability,
@@ -738,63 +720,15 @@ const connectStatusCommand = Command.make("status", {
 const connectPublishCommand = Command.make("publish", {
   ...projectLocationFlags,
   disable: Flag.Boolean("disable").pipe(
-    Flag.withDescription("Stop publishing agent activity to your mobile clients."),
+    Flag.withDescription("Acknowledge that agent activity publishing is disabled."),
     Flag.withDefault(false),
   ),
 }).pipe(
-  Command.withDescription(
-    "Toggle publishing agent activity (push notifications and Live Activities) to your mobile clients.",
-  ),
-  Command.withHandler((flags) =>
-    runCloudCommand(
-      flags,
-      Effect.gen(function* () {
-        const secrets = yield* ServerSecretStore.ServerSecretStore;
-        const tokens = yield* CliTokenManager.CloudCliTokenManager;
-        const enabled = !flags.disable;
-        if (enabled) yield* requireConnectAllowed;
-        yield* secrets.set(
-          PUBLISH_AGENT_ACTIVITY_SECRET,
-          stringToBytes(enabled ? "true" : "false"),
-        );
-        if (!enabled) {
-          // Cancel unprovisioned publish-only links too, or the next start will recreate them.
-          // Managed links also serve the tunnel and must survive.
-          const linkedNow = Option.isSome(yield* secrets.get(CLOUD_LINKED_USER_ID));
-          if (!linkedNow && (yield* CliState.readCliDesiredLinkMode) === "publish_only") {
-            yield* CliState.setCliDesiredCloudLink(false);
-            yield* Console.log("Cancelled the pending publish-only T3 Connect link.");
-          }
-          yield* Console.log("Publishing agent activity disabled.");
-          return;
-        }
-
-        yield* Console.log("Publishing agent activity enabled.");
-        const linked = Option.isSome(yield* secrets.get(CLOUD_LINKED_USER_ID));
-        if (linked) {
-          return;
-        }
-
-        if (!(yield* tokens.hasCredential)) {
-          const loginCommand = yield* resolveHostCliHint("connect login", flags.baseDir);
-          yield* Console.log(
-            `Run \`${loginCommand}\` first so this environment can be authorized to publish.`,
-          );
-          return;
-        }
-        // A desired managed link already covers publishing and must not be downgraded.
-        if (yield* CliState.readCliDesiredCloudLink) {
-          yield* Console.log(
-            "A T3 Connect link is already pending. Start T3 to finish provisioning it; publishing starts once it links.",
-          );
-          return;
-        }
-        yield* CliState.setCliDesiredCloudLink(true, "publish_only");
-        yield* Console.log(
-          "Restart T3 to finish authorizing this environment to publish (no managed tunnel is created).",
-        );
-      }),
-    ),
+  Command.withDescription("Legacy command for agent activity publishing."),
+  Command.withHandler(({ disable }) =>
+    disable
+      ? Console.log("Publishing agent activity is disabled.")
+      : Effect.fail(new AgentActivityPublishingDisabledError()),
   ),
 );
 

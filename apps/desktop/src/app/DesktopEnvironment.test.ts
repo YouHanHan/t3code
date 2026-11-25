@@ -60,6 +60,24 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
+  it.effect("uses the fork's Windows identity and keeps the packaged state paths", () =>
+    Effect.gen(function* () {
+      const packagedWindows = { platform: "win32", isPackaged: true } as const;
+      const upstream = yield* makeEnvironment(packagedWindows);
+      const fork = yield* makeEnvironment(
+        { ...packagedWindows, appVersion: "0.1.12-youhanhan.1" },
+        { T3CODE_DESKTOP_APP_USER_MODEL_ID: "com.t3tools.t3code" },
+      );
+
+      assert.equal(fork.displayName, "YouHanHan Code");
+      assert.equal(fork.appUserModelId, "io.github.youhanhan.code");
+      assert.equal(fork.appDataDirectory, upstream.appDataDirectory);
+      assert.equal(fork.baseDir, upstream.baseDir);
+      assert.equal(fork.stateDir, upstream.stateDir);
+      assert.equal(upstream.appUserModelId, "com.t3tools.t3code");
+    }),
+  );
+
   it.effect("keeps implicit development state separate from production state", () =>
     Effect.gen(function* () {
       const development = yield* makeEnvironment(

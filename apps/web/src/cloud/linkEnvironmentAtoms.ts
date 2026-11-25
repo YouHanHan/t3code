@@ -8,7 +8,6 @@ import {
   checkCloudReachability,
   linkEnvironmentToCloud,
   readCloudLinkState,
-  type CloudLinkMode,
   type CloudLinkTarget,
   unlinkEnvironmentFromCloud,
   updateCloudPreferences,
@@ -24,11 +23,8 @@ export const linkEnvironment = createRuntimeCommand(connectionAtomRuntime, {
   label: "web:cloud:link-environment",
   scheduler: cloudLinkScheduler,
   concurrency: cloudLinkConcurrency,
-  execute: (input: {
-    readonly target: CloudLinkTarget;
-    readonly clerkToken: string;
-    readonly mode?: CloudLinkMode;
-  }) => linkEnvironmentToCloud(input),
+  execute: (input: { readonly target: CloudLinkTarget; readonly clerkToken: string }) =>
+    linkEnvironmentToCloud(input),
 });
 
 export const unlinkEnvironment = createRuntimeCommand(connectionAtomRuntime, {
@@ -45,7 +41,6 @@ export const updateEnvironmentPreferences = createRuntimeCommand(connectionAtomR
   concurrency: cloudLinkConcurrency,
   execute: (input: {
     readonly target: CloudLinkTarget;
-    readonly publishAgentActivity: boolean;
     readonly holdWebhooksWhileOffline?: boolean;
   }) => updateCloudPreferences(input),
 });

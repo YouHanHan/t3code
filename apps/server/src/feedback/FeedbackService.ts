@@ -12,7 +12,6 @@ import * as Threads from "../orchestration-v2/ThreadManagementService.ts";
 import * as Projects from "../project/ProjectService.ts";
 import * as Providers from "../provider/ProviderRegistry.ts";
 import * as Settings from "../serverSettings.ts";
-import { providerDimensions } from "../telemetry/ProviderDimensions.ts";
 import {
   FEEDBACK_AWAITING_APPROVAL_NOTE,
   FEEDBACK_SUBJECT_MESSAGE,
@@ -62,8 +61,8 @@ export class FeedbackService extends Context.Service<
   FeedbackService,
   {
     /**
-     * Sends an unprompted report at once. A requested one is shown to the user in a card and
-     * returns at once; it is stored and sent only if they choose Send.
+     * Stores an unprompted report at once. A requested one is shown to the user in a card and
+     * returns at once; it is stored only if they approve.
      */
     readonly submit: (
       input: FeedbackInput,
@@ -145,7 +144,6 @@ const make = Effect.fn("FeedbackService.make")(function* (
     };
     const id = yield* random.uuidV7();
     const runId = thread?.activeRunId ?? null;
-    const providerList = yield* providers.getProviders;
     if (!input.userRequested) {
       return yield* store.store({
         id,
@@ -153,10 +151,6 @@ const make = Effect.fn("FeedbackService.make")(function* (
         source: caller.source,
         threadId: caller.threadId ?? null,
         runId,
-        dimensions:
-          caller.source === "mcp" && thread !== undefined
-            ? providerDimensions(providerList, thread.modelSelection)
-            : {},
       });
     }
 
@@ -168,7 +162,8 @@ const make = Effect.fn("FeedbackService.make")(function* (
             .getThreadRecords(threadId, ["runs"], { runIds: [runId] })
             .pipe(Effect.mapError(storageError))).runs.find((candidate) => candidate.id === runId);
     if (run === undefined || run.rootNodeId === null) return yield* new FeedbackApprovalError({});
-    // Both traces are built now, so the card shows exactly what each choice sends.
+    const providerList = yield* providers.getProviders;
+    // Both traces are built now, so the card shows exactly what each choice stores.
     const traces = yield* Effect.gen(function* () {
       // Records cannot filter on started, so widen past the unstarted (queued) runs the last
       // read found. Each pass reads more runs than the one before, until it holds enough

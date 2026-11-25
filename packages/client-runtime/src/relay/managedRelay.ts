@@ -24,9 +24,7 @@ import {
   type RelayPublicClientId,
   type RelayT3ChatLinkRequestResponse,
   type RelayT3ChatLinkResponse,
-  RelayRegisterDeviceEndpoint,
   RelayAgentActivitySnapshotEndpoint,
-  RelayRegisterLiveActivityEndpoint,
   RelayProtectedError,
   type RelayProtectedError as RelayProtectedErrorType,
   RelayUnregisterDeviceEndpoint,
@@ -607,10 +605,6 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
       method: RelayConnectEnvironmentEndpoint.method,
       url: urlBuilder.dpopClient.connectEnvironment({ params: { environmentId } }),
     }),
-    registerDevice: (): DpopProofTarget => ({
-      method: RelayRegisterDeviceEndpoint.method,
-      url: urlBuilder.mobile.registerDevice(),
-    }),
     unregisterDevice: (deviceId: string): DpopProofTarget => ({
       method: RelayUnregisterDeviceEndpoint.method,
       url: urlBuilder.mobile.unregisterDevice({ params: { deviceId } }),
@@ -618,10 +612,6 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
     getAgentActivitySnapshot: (): DpopProofTarget => ({
       method: RelayAgentActivitySnapshotEndpoint.method,
       url: urlBuilder.mobile.getAgentActivitySnapshot(),
-    }),
-    registerLiveActivity: (): DpopProofTarget => ({
-      method: RelayRegisterLiveActivityEndpoint.method,
-      url: urlBuilder.mobile.registerLiveActivity(),
     }),
   };
 
@@ -1020,28 +1010,10 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
       Effect.withSpan("clientRuntime.managedRelay.connectEnvironment"),
       withRelayClientTracing,
     ),
-    registerDevice: Effect.fnUntraced(
-      function* (input) {
-        return yield* mobileRegistrationRequest(
-          {
-            clerkToken: input.clerkToken,
-            target: dpopProofTargets.registerDevice(),
-          },
-          (authorization) =>
-            client.mobile
-              .registerDevice({
-                headers: dpopHeaders(authorization),
-                payload: input.payload,
-              })
-              .pipe(
-                Effect.mapError(relayRequestError("register relay mobile device")),
-                timeoutRelayRequest("Relay mobile device registration"),
-              ),
-        );
-      },
-      Effect.withSpan("clientRuntime.managedRelay.registerDevice"),
-      withRelayClientTracing,
-    ),
+    registerDevice: () =>
+      Effect.fail(
+        new ManagedRelayRequestFailedError({ action: "register relay mobile device", cause: null }),
+      ),
     unregisterDevice: Effect.fnUntraced(
       function* (input) {
         return yield* mobileRegistrationRequest(
@@ -1085,28 +1057,10 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
       Effect.withSpan("clientRuntime.managedRelay.getAgentActivitySnapshot"),
       withRelayClientTracing,
     ),
-    registerLiveActivity: Effect.fnUntraced(
-      function* (input) {
-        return yield* mobileRegistrationRequest(
-          {
-            clerkToken: input.clerkToken,
-            target: dpopProofTargets.registerLiveActivity(),
-          },
-          (authorization) =>
-            client.mobile
-              .registerLiveActivity({
-                headers: dpopHeaders(authorization),
-                payload: input.payload,
-              })
-              .pipe(
-                Effect.mapError(relayRequestError("register relay live activity")),
-                timeoutRelayRequest("Relay Live Activity registration"),
-              ),
-        );
-      },
-      Effect.withSpan("clientRuntime.managedRelay.registerLiveActivity"),
-      withRelayClientTracing,
-    ),
+    registerLiveActivity: () =>
+      Effect.fail(
+        new ManagedRelayRequestFailedError({ action: "register relay live activity", cause: null }),
+      ),
     resetTokenCache: SynchronizedRef.set(cachedTokens, []).pipe(
       Effect.andThen(options.accessTokenStore ? options.accessTokenStore.clear : Effect.void),
       Effect.withSpan("clientRuntime.managedRelay.resetTokenCache"),

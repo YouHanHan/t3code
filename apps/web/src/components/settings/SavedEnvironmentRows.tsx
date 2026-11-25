@@ -580,7 +580,6 @@ function ConfiguredCloudLinkRow({
     linkRevoked,
     managedTunnelActive,
     managedTunnelOutOfSync,
-    publishAgentActivity,
     holdWebhooksWhileOffline,
     operationError,
     tunnelLimit,
@@ -616,11 +615,6 @@ function ConfiguredCloudLinkRow({
   );
   const tunnelNeedsConfigure = needsRelayConfiguration({
     managedTunnel: !managedTunnelActive,
-    publish: publishAgentActivity,
-  });
-  const publishNeedsConfigure = needsRelayConfiguration({
-    managedTunnel: managedTunnelActive,
-    publish: !publishAgentActivity,
   });
   // `isSignedIn` is undefined until Clerk loads. Signed out, one row shows a
   // sign-in button instead of its switch; the onboarding dialog that opens after
@@ -662,46 +656,23 @@ function ConfiguredCloudLinkRow({
   const updateManagedTunnel = async (enabled: boolean) => {
     if (!readEnvironmentScope(environmentId, AuthRelayWriteScope)) return;
     setIsUpdating(true);
-    const ok = await reconcileCloudState({ managedTunnel: enabled, publish: publishAgentActivity });
+    const ok = await reconcileCloudState({ managedTunnel: enabled });
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled
-          ? gt("T3 Connect linked")
-          : publishAgentActivity
-            ? gt("T3 Connect tunnel disabled")
-            : gt("T3 Connect unlinked"),
+        title: enabled ? gt("T3 Connect linked") : gt("T3 Connect unlinked"),
         description: enabled
           ? gt("This environment is available through T3 Connect.")
-          : publishAgentActivity
-            ? gt("The managed tunnel was removed. Agent activity publishing stays on.")
-            : gt("This environment is no longer available through T3 Connect."),
+          : gt("This environment is no longer available through T3 Connect."),
       });
     }
     setIsUpdating(false);
-  };
-
-  const updatePublishAgentActivity = async (enabled: boolean) => {
-    if (!readEnvironmentScope(environmentId, AuthRelayWriteScope)) return;
-    setIsUpdatingPreference(true);
-    const ok = await reconcileCloudState({ managedTunnel: managedTunnelActive, publish: enabled });
-    if (ok) {
-      toastManager.add({
-        type: "success",
-        title: enabled ? gt("Agent activity enabled") : gt("Agent activity disabled"),
-        description: enabled
-          ? gt("This environment publishes agent activity to your mobile clients.")
-          : gt("This environment will stop publishing agent activity."),
-      });
-    }
-    setIsUpdatingPreference(false);
   };
 
   const updateHoldWebhooks = async (enabled: boolean) => {
     setIsUpdatingPreference(true);
     const ok = await reconcileCloudState({
       managedTunnel: managedTunnelActive,
-      publish: publishAgentActivity,
       holdWebhooksWhileOffline: enabled,
     });
     if (ok) {
@@ -780,30 +751,6 @@ function ConfiguredCloudLinkRow({
         <SettingsRow
           title={setting("t3-connect").title}
           description={gt("Run `t3 connect link` on the host, then restart T3 Code there.")}
-        />
-      )}
-      {signedOut && showSwitch ? null : (
-        <SettingsRow
-          title={setting("publish-agent-activity").title}
-          description={
-            signedOut
-              ? gt("Sign in to send activity to mobile notifications and Live Activities.")
-              : gt("Send activity to mobile notifications and Live Activities without T3 Connect.")
-          }
-          managed={connectDenial}
-          control={
-            signedOut ? (
-              signInButton
-            ) : (
-              <CloudLinkSwitch
-                ariaLabel={gt("Publish agent activity to mobile clients")}
-                checked={publishAgentActivity}
-                disabled={switchDisabled || publishNeedsConfigure}
-                disabledReason={disabledReason ?? (publishNeedsConfigure ? configureReason : null)}
-                onCheckedChange={(enabled) => void updatePublishAgentActivity(enabled)}
-              />
-            )
-          }
         />
       )}
       {managedTunnelActive && !signedOut ? (

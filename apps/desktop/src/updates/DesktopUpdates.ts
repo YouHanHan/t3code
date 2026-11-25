@@ -10,6 +10,7 @@ import {
   type DesktopUpdateState,
 } from "@t3tools/contracts";
 import { errorTag } from "@t3tools/shared/observability";
+import { isYouHanHanCodeVersion, YOUHANHAN_CODE_NAME } from "@t3tools/shared/youHanHanBrand";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -393,6 +394,9 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
   const policy = yield* DesktopUpdatePolicy.DesktopUpdatePolicy;
+  const forkDisabledReason = isYouHanHanCodeVersion(environment.appVersion)
+    ? Option.some(`Automatic updates are disabled for ${YOUHANHAN_CODE_NAME}.`)
+    : Option.none();
   // Any user can set the mock flag, so it never replaces an administrator's update source.
   const mockUpdates = config.mockUpdates && policy.message === null;
 
@@ -482,6 +486,7 @@ export const make = Effect.gen(function* () {
   );
 
   const resolveDisabledReason = Effect.gen(function* () {
+    if (Option.isSome(forkDisabledReason)) return forkDisabledReason;
     const hasFeedConfig = yield* hasUpdateFeedConfig;
     return Option.fromNullishOr(
       getAutoUpdateDisabledReason({
@@ -1318,6 +1323,12 @@ export const make = Effect.gen(function* () {
       Effect.flatMap((state) => resolveStateDisabledReason(state.channel)),
     ),
     configure: Effect.gen(function* () {
+      if (Option.isSome(forkDisabledReason)) {
+        const { updateChannel } = yield* desktopSettings.get;
+        yield* Ref.set(desktopState.canInstallUpdates, false);
+        yield* setState(yield* baseUpdateState(updateChannel, forkDisabledReason));
+        return;
+      }
       const context = yield* Effect.context<never>();
       // Runs synchronously up to the first await, so a check's outcome is applied before the
       // check's promise resolves and wakes the actions waiting on it.

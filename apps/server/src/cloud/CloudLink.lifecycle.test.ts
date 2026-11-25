@@ -28,7 +28,6 @@ import {
   type ServiceUpdateRecord,
 } from "./serviceProtocol.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import * as AgentAwarenessRelay from "../relay/AgentAwarenessRelay.ts";
 import { CLOUD_CLI_DESIRED_LINK_SECRET } from "./CliState.ts";
 import * as CliTokenManager from "./CliTokenManager.ts";
 import {
@@ -66,13 +65,6 @@ const storeFailure = (tag: "AlreadyExists" | "PermissionDenied") =>
   });
 
 const unusedSecretStoreOperation = () => Effect.die("unused secret-store operation");
-
-const idleAwarenessRelay = AgentAwarenessRelay.AgentAwarenessRelay.of({
-  publishThread: () => Effect.void,
-  drain: Effect.void,
-  requestCatchUp: () => Effect.void,
-  start: () => Effect.void,
-});
 
 const idleHttpServer = HttpServer.HttpServer.of({
   address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 3773),
@@ -189,7 +181,6 @@ describe("releaseManagedTunnelOnShutdown", () => {
           address: harness.address ?? idleHttpServer.address,
         }),
         Effect.provideService(ServerSecretStore.ServerSecretStore, harness.store),
-        Effect.provideService(AgentAwarenessRelay.AgentAwarenessRelay, idleAwarenessRelay),
         Effect.provideService(
           ServerEnvironment.ServerEnvironment,
           ServerEnvironment.ServerEnvironment.of({
@@ -340,7 +331,10 @@ describe("releaseManagedTunnelOnShutdown", () => {
     [CLOUD_CLI_DESIRED_LINK_SECRET, "managed"],
   ] as const;
 
-  it.effect("does not recreate a link that was unlinked while startup registration retried", () => {
+  it.effect.each([
+    { name: "unlinked while startup registration retried", legacy: false },
+    { name: "configured for legacy activity publishing", legacy: true },
+  ])("does not recreate a link $name", ({ legacy }) => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -348,7 +342,11 @@ describe("releaseManagedTunnelOnShutdown", () => {
     return Effect.gen(function* () {
       const link = yield* CloudLink.CloudLink;
 
-      values.delete(CLOUD_CLI_DESIRED_LINK_SECRET);
+      if (legacy) {
+        values.set(CLOUD_CLI_DESIRED_LINK_SECRET, new TextEncoder().encode("publish_only"));
+      } else {
+        values.delete(CLOUD_CLI_DESIRED_LINK_SECRET);
+      }
 
       expect(yield* link.reconcileDesiredLinkIfStillDesired("http://127.0.0.1:3773")).toBeNull();
       expect(requests).toEqual([]);
@@ -746,7 +744,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
       ...(partialDrop ? [] : [[CLOUD_LINKED_USER_ID, "user-123"] as const]),
       [RELAY_ENVIRONMENT_CREDENTIAL_SECRET, "old-credential"],
       ...(revoked ? [[CLOUD_LINK_REVOKED, "true"] as const] : []),
-      [CLOUD_CLI_DESIRED_LINK_SECRET, startup ? "publish_only" : "managed"],
+      [CLOUD_CLI_DESIRED_LINK_SECRET, "managed"],
     ]);
     const cloudMintPublicKey =
       "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAqZ2u2LjMoAyG2QTHXmITJ9w6RzZtVUAv394XCcPV0zE=\n-----END PUBLIC KEY-----";

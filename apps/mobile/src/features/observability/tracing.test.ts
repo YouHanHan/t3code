@@ -1,68 +1,37 @@
-import { expect, it } from "@effect/vitest";
-import * as Cause from "effect/Cause";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import { vi } from "vite-plus/test";
+import { expect, it, vi } from "vite-plus/test";
 
-import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
-
-import { setConnectionTracesEnabled } from "./diagnosticsSetting";
-import * as Tracing from "./tracing";
+import config from "../../../app.config.ts";
+import { resolveCloudPublicConfig } from "../cloud/publicConfig";
 
 vi.mock("expo-constants", () => ({
   default: {
     expoConfig: {
-      extra: {},
+      extra: {
+        relay: { url: "https://relay.example" },
+        observability: {
+          tracesUrl: "https://collector.example/v1/traces",
+          tracesDataset: "mobile",
+          tracesToken: "test-token",
+        },
+      },
     },
   },
 }));
 
-const layerTracingTo = (fetchFn: typeof fetch) =>
-  Tracing.layerFromConfig(
-    {
-      tracesUrl: "https://api.axiom.test/v1/traces",
-      tracesDataset: "mobile-traces",
-      tracesToken: "public-ingest-token",
-    },
-    {
-      appVariant: "test",
-      serviceInstanceId: "test-instance",
-      serviceVersion: "1.2.3",
-    },
-  ).pipe(Layer.provide(layerRemoteHttpClient(fetchFn)));
+vi.mock("../../../../../scripts/lib/public-config.ts", () => ({
+  loadRepoEnv: () => ({
+    T3CODE_RELAY_URL: "https://relay.example",
+    EXPO_PUBLIC_OTLP_TRACES_URL: "https://collector.example/v1/traces",
+    EXPO_PUBLIC_OTLP_TRACES_DATASET: "mobile",
+    EXPO_PUBLIC_OTLP_TRACES_TOKEN: "test-token",
+    T3CODE_ANDROID_GOOGLE_SERVICES_FILE: "google-services.json",
+  }),
+}));
 
-it.effect.each([false, true])("gates relay sends and preserves typed failures (%s)", (enabled) => {
-  setConnectionTracesEnabled(enabled);
-  const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
-  const layerTracing = layerTracingTo(fetchFn);
-  const failure = { durationNanos: 1n };
-  const layerTracedApplication = Layer.effectDiscard(
-    Effect.fail(failure).pipe(
-      Effect.withSpan("mobile.test.failed-span"),
-      withRelayClientTracing,
-      Effect.exit,
-      Effect.flatMap((exit) => {
-        const reason = exit._tag === "Failure" ? exit.cause.reasons[0] : undefined;
-        return reason && Cause.isFailReason(reason)
-          ? Effect.sync(() => {
-              expect(reason.error).toBe(failure);
-            })
-          : Effect.die(new Error("Expected the original typed failure."));
-      }),
-    ),
-  ).pipe(Layer.provide(layerTracing));
-
-  return Layer.build(layerTracedApplication).pipe(
-    Effect.scoped,
-    Effect.andThen(
-      Effect.sync(() => {
-        expect(fetchFn).toHaveBeenCalledTimes(Number(enabled));
-        if (!enabled) return;
-        expect(new TextDecoder().decode(fetchFn.mock.calls[0]?.[1]?.body as Uint8Array)).toContain(
-          "mobile.test.failed-span",
-        );
-      }),
-    ),
-  );
+it("omits telemetry destinations from new builds and ignores them in older manifests", () => {
+  expect(config.extra).not.toHaveProperty("observability");
+  expect(config.extra?.eas).not.toHaveProperty("observe");
+  expect(config.android).not.toHaveProperty("googleServicesFile");
+  expect(resolveCloudPublicConfig()).not.toHaveProperty("observability");
+  expect(resolveCloudPublicConfig().relay.url).toBe("https://relay.example");
 });

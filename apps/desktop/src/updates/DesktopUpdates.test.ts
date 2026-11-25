@@ -139,6 +139,26 @@ describe("DesktopUpdates", () => {
     ).pipe(Effect.provide(harness.layer));
   });
 
+  it.effect("keeps the fork disabled even when an updater feed is configured", () => {
+    const harness = makeHarness({ platform: "win32", appVersion: "0.1.12-youhanhan.1" });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        const desktopState = yield* DesktopState.DesktopState;
+        yield* updates.configure;
+
+        assert.equal((yield* updates.getState).status, "disabled");
+        assert.isTrue(Option.isSome(yield* updates.disabledReason));
+        assert.isFalse(yield* Ref.get(desktopState.canInstallUpdates));
+        assert.isFalse((yield* updates.check("menu")).checked);
+        assert.equal(harness.checkCount(), 0);
+        assert.equal(harness.listenerCount(), 0);
+        assert.deepEqual(harness.feedUrls(), []);
+      }),
+    ).pipe(Effect.provide(harness.layer));
+  });
+
   it.effect("re-checks an offered update without announcing it again", () => {
     const harness = makeHarness();
 

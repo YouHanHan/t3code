@@ -35,9 +35,17 @@ export const BRAND_ASSET_PATHS = {
   developmentWebAppleTouchIconPng: "assets/dev/blueprint-web-apple-touch-180.png",
   developmentWebIcon192Png: "assets/dev/blueprint-web-icon-192x192.png",
   developmentWebIcon512Png: "assets/dev/blueprint-web-icon-512x512.png",
+
+  youHanHanWindowsIconIco: "assets/youhanhan/windows.ico",
+  youHanHanWebFaviconIco: "assets/youhanhan/favicon.ico",
+  youHanHanWebFavicon16Png: "assets/youhanhan/favicon-16x16.png",
+  youHanHanWebFavicon32Png: "assets/youhanhan/favicon-32x32.png",
+  youHanHanWebAppleTouchIconPng: "assets/youhanhan/apple-touch-icon.png",
+  youHanHanWebIcon192Png: "assets/youhanhan/icon-192x192.png",
+  youHanHanWebIcon512Png: "assets/youhanhan/icon-512x512.png",
 } as const;
 
-export type WebAssetBrand = "development" | "nightly" | "production";
+export type WebAssetBrand = "development" | "nightly" | "production" | "youhanhan";
 
 export const WEB_ASSET_CHANNELS = ["latest", "nightly"] as const;
 
@@ -85,6 +93,14 @@ const WEB_ICON_SOURCE_PATHS_BY_BRAND = {
     appleTouchIconPng: BRAND_ASSET_PATHS.productionWebAppleTouchIconPng,
     icon192Png: BRAND_ASSET_PATHS.productionWebIcon192Png,
     icon512Png: BRAND_ASSET_PATHS.productionWebIcon512Png,
+  },
+  youhanhan: {
+    faviconIco: BRAND_ASSET_PATHS.youHanHanWebFaviconIco,
+    favicon16Png: BRAND_ASSET_PATHS.youHanHanWebFavicon16Png,
+    favicon32Png: BRAND_ASSET_PATHS.youHanHanWebFavicon32Png,
+    appleTouchIconPng: BRAND_ASSET_PATHS.youHanHanWebAppleTouchIconPng,
+    icon192Png: BRAND_ASSET_PATHS.youHanHanWebIcon192Png,
+    icon512Png: BRAND_ASSET_PATHS.youHanHanWebIcon512Png,
   },
 } as const satisfies Record<WebAssetBrand, Record<keyof typeof WEB_ICON_TARGET_FILENAMES, string>>;
 

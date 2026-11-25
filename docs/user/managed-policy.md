@@ -146,8 +146,7 @@ A few settings need care:
 - `worktreeCleanup`, which projects can also set, overrides the `worktree` rules in
   `storageCleanup`. Lock it along with those rules; T3 Code refuses a policy that locks only the
   rules.
-- `observability` cannot be managed. Its OTLP endpoints come from each user's environment
-  variables, settings file and desktop startup input, which a policy cannot override.
+- `observability` is accepted for compatibility with existing settings. Diagnostic exports are disabled.
 - Manage `idleCompaction`, not the older `compactIdleThreads`. A Claude instance's own idle
   compaction choice still wins over `idleCompaction`.
 - A provider instance's fields override each other, so lock `providerInstances.<id>` as a whole,
@@ -262,9 +261,8 @@ so restart T3 Code after that.
   `t3.json` declares, whether or not a user approved them. Such a project gets no new worktree
   threads; existing thread folders are restored as plain checkouts and removed without the
   project's `remove` command.
-- `telemetry: false`: the server and desktop app send no [product usage data](./telemetry.md) or
-  relay connection traces, and neither does a browser opened from the server. A policy cannot turn
-  them on. The hosted web app at app.t3.codes and the mobile app still send their own relay traces.
+- `telemetry: false`: accepted for compatibility with older managed policies. [Product usage data
+  and client connection traces](./telemetry.md) stay off regardless of the policy.
 
 ### Providers
 

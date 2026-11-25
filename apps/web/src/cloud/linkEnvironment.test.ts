@@ -26,7 +26,11 @@ import { ManagedRelay } from "@t3tools/client-runtime/relay";
 import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
 import { __resetDesktopPrimaryAuthForTests } from "../environments/primary/desktopAuth";
 
-import { readCloudLinkState, unlinkEnvironmentFromCloud } from "./linkEnvironment";
+import {
+  readCloudLinkState,
+  unlinkEnvironmentFromCloud,
+  updateCloudPreferences,
+} from "./linkEnvironment";
 
 const TARGET = {
   environmentId: "environment-1",
@@ -281,6 +285,38 @@ describe("web cloud link environment client", () => {
         message:
           "Disconnected locally, but T3 Connect did not confirm it removed this environment: Relay encountered an internal error (upstream_unavailable).",
         traceId: "trace-unlink",
+      });
+    }),
+  );
+
+  it.effect("turns off activity reporting when saving preferences on an older host", () =>
+    Effect.gen(function* () {
+      const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Response.json({
+          linked: true,
+          cloudUserId: "user-1",
+          relayUrl: "https://relay.example.test",
+          relayIssuer: "https://relay.example.test",
+          managedTunnelActive: true,
+          publishAgentActivity: false,
+          holdWebhooksWhileOffline: true,
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      yield* withServices(
+        updateCloudPreferences({
+          target: { environmentId: EnvironmentId.make(SAVED_SERVICE_TARGET.environmentId) },
+          holdWebhooksWhileOffline: true,
+        }),
+      );
+
+      const [input, init] = fetchMock.mock.calls[0]!;
+      const request = new Request(input, init);
+      expect(request.url).toBe(`${SAVED_SERVICE_TARGET.httpBaseUrl}/api/connect/preferences`);
+      expect(yield* Effect.promise(() => request.json())).toEqual({
+        publishAgentActivity: false,
+        holdWebhooksWhileOffline: true,
       });
     }),
   );

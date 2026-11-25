@@ -1723,7 +1723,7 @@ it.effect("hides tools for links and refuses another environment while the beta 
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect("offers agent feedback tools only while the setting is on, to every client", () =>
+it.effect("keeps agent feedback tools hidden even when saved settings enable them", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const agentScope: McpInvocationContext.McpThreadInvocationScope = {
@@ -1834,19 +1834,15 @@ it.effect("offers agent feedback tools only while the setting is on, to every cl
           arguments: { kind: "bug", subject: "", expected: "a", actual: "b", workaround: "" },
         });
 
-      expect(yield* found).toEqual([]);
-      for (const token of ["agentToken", "cliToken"]) {
-        expect(yield* listed(token)).toEqual([]);
-        // `t3 feedback` turns exactly this answer into the Labs message.
-        expect(yield* report(token)).toMatchObject({
-          error: { code: -32602, message: "Tool 't3_feedback' not found" },
-        });
-      }
-
-      yield* settings.updateSettings({ agentFeedback: { mode: "on-request" } });
-      expect(yield* found).toEqual(expect.arrayContaining(["t3_feedback"]));
-      for (const token of ["agentToken", "cliToken"]) {
-        expect(yield* listed(token)).toEqual(["t3_feedback"]);
+      for (const mode of ["off", "on-request", "auto"] as const) {
+        yield* settings.updateSettings({ agentFeedback: { mode } });
+        expect(yield* found).toEqual([]);
+        for (const token of ["agentToken", "cliToken"]) {
+          expect(yield* listed(token)).toEqual([]);
+          expect(yield* report(token)).toMatchObject({
+            error: { code: -32602, message: "Tool 't3_feedback' not found" },
+          });
+        }
       }
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),

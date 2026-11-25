@@ -2,7 +2,6 @@ import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Layer from "effect/Layer";
 import * as References from "effect/References";
 import * as Runtime from "effect/Runtime";
 import * as Schema from "effect/Schema";
@@ -10,33 +9,15 @@ import { Command, Flag, GlobalFlag } from "effect/cli";
 
 import * as ServerConfig from "../config.ts";
 import { readFeedbackReports } from "../feedback/FeedbackList.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
-import * as ServerSettings from "../serverSettings.ts";
 
-import {
-  FEEDBACK_CLI_CLIENT_LABEL,
-  FEEDBACK_OFF_MESSAGE,
-  FeedbackInput,
-  FeedbackOffError,
-  FeedbackSubmitResult,
-} from "../feedback/FeedbackReport.ts";
+import { FeedbackInput } from "../feedback/FeedbackReport.ts";
 import {
   authLocationFlags,
   type CliAuthLocationFlags,
   projectLocationFlags,
   resolveCliAuthConfig,
 } from "./config.ts";
-import {
-  jsonFlag,
-  printJson,
-  reportThreadErrors,
-  ThreadToolFailedError,
-  withThreadTools,
-} from "./thread.ts";
-
-/** The server hides the feedback tools from every session while the setting is off. */
-const feedbackOff = ({ tool }: { readonly tool: string }) =>
-  Effect.fail(new ThreadToolFailedError({ tool, detail: FEEDBACK_OFF_MESSAGE }));
+import { jsonFlag, printJson, reportThreadErrors, ThreadToolFailedError } from "./thread.ts";
 
 class FeedbackListError extends Schema.TaggedError<FeedbackListError>()("FeedbackListError", {
   detail: Schema.String,
@@ -59,9 +40,6 @@ const listReports = Effect.fn("cli.feedback.listReports")(function* (flags: CliA
     quietLogs: true,
   });
   return yield* Effect.gen(function* () {
-    // Settings first, from the file alone, so Off never opens the database.
-    const { agentFeedback } = yield* ServerSettings.readServerSettingsFromDisk;
-    if (agentFeedback.mode === "off") return yield* new FeedbackOffError({});
     const { dbPath } = yield* ServerConfig.ServerConfig;
     const fs = yield* FileSystem.FileSystem;
     if (!(yield* fs.exists(dbPath))) return [];
@@ -70,7 +48,7 @@ const listReports = Effect.fn("cli.feedback.listReports")(function* (flags: CliA
       Effect.provide(NodeSqliteClient.layer({ filename: dbPath, readonly: true })),
     );
   }).pipe(
-    Effect.provide(ManagedPolicy.layer.pipe(Layer.provideMerge(ServerConfig.layer(config)))),
+    Effect.provide(ServerConfig.layer(config)),
     Effect.provideService(References.MinimumLogLevel, "Error"),
   );
 });
@@ -106,10 +84,7 @@ const feedbackListCommand = Command.make("list", { ...authLocationFlags, json: j
       },
       // Every failure is one line on stderr; the runtime does not log it again.
       Effect.catch((error) => {
-        const detail =
-          error._tag === "FeedbackOffError"
-            ? error.message
-            : `Could not read this machine's feedback reports: ${firstLine(error)}`;
+        const detail = `Could not read this machine's feedback reports: ${firstLine(error)}`;
         return Console.error(detail).pipe(
           Effect.andThen(Effect.fail(new FeedbackListError({ detail }))),
         );
@@ -133,21 +108,14 @@ export const feedbackCommand = Command.make("feedback", {
     Flag.withDefault(""),
   ),
 }).pipe(
-  Command.withDescription(
-    "Send feedback about T3 Code to the T3 team. Needs Agent feedback set to Automatic in Settings > Labs; to approve a report first, ask your agent in a thread.",
-  ),
-  Command.withHandler(({ baseDir, kind, subject, expected, actual, workaround }) =>
-    withThreadTools(
-      { baseDir, json: true, clientLabel: FEEDBACK_CLI_CLIENT_LABEL },
-      Effect.fn("cli.feedback.submit")(function* (tools) {
-        const report = yield* tools.call(
-          "t3_feedback",
-          { kind, subject, expected, actual, workaround },
-          FeedbackSubmitResult,
-        );
-        yield* printJson(report);
+  Command.withDescription("View feedback reports previously saved on this machine."),
+  Command.withHandler(() =>
+    Effect.fail(
+      new ThreadToolFailedError({
+        tool: "t3_feedback",
+        detail: "Sending agent feedback is disabled in this build.",
       }),
-    ).pipe(Effect.catchTags({ ThreadToolMissingError: feedbackOff }), reportThreadErrors),
+    ).pipe(reportThreadErrors),
   ),
   Command.withSubcommands([feedbackListCommand]),
 );

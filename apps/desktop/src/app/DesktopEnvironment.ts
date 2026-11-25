@@ -17,6 +17,11 @@ import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
 import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 import type { OtlpProtocol } from "@t3tools/shared/observability";
+import {
+  isYouHanHanCodeVersion,
+  YOUHANHAN_CODE_APP_ID,
+  YOUHANHAN_CODE_NAME,
+} from "@t3tools/shared/youHanHanBrand";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -103,6 +108,9 @@ export function resolveDesktopAppBranding(input: {
   readonly appVersion: string;
 }): DesktopAppBranding {
   const stageLabel = resolveDesktopAppStageLabel(input);
+  if (isYouHanHanCodeVersion(input.appVersion)) {
+    return { baseName: YOUHANHAN_CODE_NAME, stageLabel, displayName: YOUHANHAN_CODE_NAME };
+  }
   return {
     baseName: APP_BASE_NAME,
     stageLabel,
@@ -227,9 +235,11 @@ const make = Effect.fn("desktop.environment.make")(function* (
     otlpProtocol: config.otlpProtocol,
     branding,
     displayName,
-    appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
-      isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
-    ),
+    appUserModelId: isYouHanHanCodeVersion(input.appVersion)
+      ? YOUHANHAN_CODE_APP_ID
+      : Option.getOrElse(config.appUserModelIdOverride, () =>
+          isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
+        ),
     linuxDesktopEntryName: resolveLinuxDesktopEntryName(isDevelopment),
     linuxApplicationsDir,
     desktopLauncherPath: config.desktopLauncherPath,

@@ -11,7 +11,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { MessageResolver } from "../../i18n/messages";
 
-import { DESKTOP_DOWNLOAD_URL } from "~/branding";
+import { APP_BASE_NAME, DESKTOP_DOWNLOAD_URL, IS_YOUHANHAN_CODE } from "~/branding";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { isHostedStaticApp } from "~/hostedPairing";
 import { useEnvironments } from "~/state/environments";
@@ -196,7 +196,7 @@ function HostedPromptLinkLanding({
           </Button>
         ) : null}
         <Button variant="ghost" render={<a href={DESKTOP_DOWNLOAD_URL} />}>
-          <T>Get T3 Code</T>
+          {IS_YOUHANHAN_CODE ? gt("Get {app}", { app: APP_BASE_NAME }) : <T>Get T3 Code</T>}
         </Button>
       </div>
       <label className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">

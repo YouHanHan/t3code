@@ -62,20 +62,10 @@ The smoke check uploads a unique fixture, restores its output into a cold second
 - A local hit makes no remote request and is not uploaded retroactively. Clear only an isolated worktree's task cache when testing uploads of an already-cached task.
 - Production retains results for seven days within a 64 GB budget. Remote errors fall back to execution. `VP_REMOTE_CACHE=off vp run ...` disables the remote tier for one invocation.
 
-## Savings and tracing
+## Service monitoring
 
-Alchemy also owns the `t3-task-cache-traces` Axiom dataset, its ingest-only Worker token, a savings dashboard, and a separate retained D1 database for lifetime counters. Deployment needs an Axiom Alchemy profile or `AXIOM_TOKEN`/`AXIOM_ORG_ID` as well as Cloudflare credentials. Contributor machines never receive the Axiom token.
-
-Both `vp run` and its `vpr` shortcut invoke the hook. The hook observes Vite+'s atomic `last-summary.json` files, including nested runs. It reports package/task names, confirmed local and remote hits, avoided task runtime, developer identity, host, OS/architecture, and CI run ID. It does not send commands, arguments, source paths, environment variables, or task output. Developer identity comes from the authenticated cache writer; CI uses GitHub's verified OIDC actor. Same-repository PRs may upload artifacts as well as telemetry. Fork jobs do not install the hook or report telemetry.
-
-Reports spool locally and retry on subsequent commands. The completion hook queues the final summary, including failed runs. Local runs start a detached, short-lived Node process; CI awaits its bounded flush before the runner can terminate it. Collection or export failures never change the task exit status. No background service is installed. Queues retain at most 2,000 reports, each sent with a three-second timeout and a 15-second budget per flush. Stable report IDs and transactional D1 receipts prevent duplicate lifetime increments. Receipts expire after 31 days; accepted reports must be less than 30 days old. Lifetime totals survive raw trace expiration and are re-exported hourly, including inactive developers and hosts. Collection starts when the hook is installed; existing cache history is not backfilled.
-
-**Saved time means historical task execution time avoided.** It is useful as a compute proxy, but it is not measured CPU time, money saved, or elapsed developer waiting time. Parallel tasks can overlap, and cache lookup/restore overhead is not subtracted. Failed restores contribute no savings. Older Vite+ versions omit the hit source; their confirmed savings are counted under an explicit unspecified tier. Native summary collection is best-effort: interrupted runs or summaries overwritten before observation can be missing. The experimental Vite+ summary schema is tested here and must be checked when upgrading Vite+.
-
-Host labels use `~/.agents/MACHINE` when present, otherwise the hostname. GitHub-hosted runners use their runner OS/architecture class to avoid a new lifetime series for every ephemeral VM. Set `T3_TASK_CACHE_HOST` to override the label, or `T3_TASK_CACHE_TELEMETRY=off` to opt out while retaining remote caching. Re-run the installer to update an existing machine's hook.
+Alchemy owns the Worker monitoring deployment and its Axiom dataset. The current hook uses the same remote cache modes for `vp run` and `vpr`. Vite+ task summaries stay on the machine that runs the tasks, and the native client build reports its result to the local console. Re-run the installer to update a hook installed from an earlier checkout.
 
 Writer administration requires the complete private registry on the administering machine. Copy that registry securely from its administrator before adding a writer on another machine. `add-writer --new-registry` explicitly initializes a new cache; never use it to recover an existing registry.
 
 Node processes running with filesystem permissions must allow the installed preload and hook directory. Remove the task-cache import from `NODE_OPTIONS` for a restricted process that cannot allow those files.
-
-Local telemetry is queued to disk before command exit and uploaded by a short-lived detached Node process. Slow or offline endpoints do not delay `vp run`; unsent reports retry on a later run.

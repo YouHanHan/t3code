@@ -1,3 +1,4 @@
+import { isYouHanHanCodeVersion } from "@t3tools/shared/youHanHanBrand";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -187,4 +188,10 @@ export const install = Effect.gen(function* () {
     ),
     Effect.withSpan("desktop.cliShim.install"),
   );
+});
+
+// Windows 的 PATH 可以指向共享启动器，启动独立版时应保留现有指向。
+export const installOnStartup = Effect.gen(function* () {
+  const environment = yield* DesktopEnvironment.DesktopEnvironment;
+  return isYouHanHanCodeVersion(environment.appVersion) ? Option.none<string>() : yield* install;
 });

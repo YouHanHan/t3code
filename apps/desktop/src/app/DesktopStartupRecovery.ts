@@ -1,4 +1,8 @@
 import type { DesktopUpdateState } from "@t3tools/contracts";
+import {
+  isYouHanHanCodeVersion,
+  YOUHANHAN_CODE_REPOSITORY_URL,
+} from "@t3tools/shared/youHanHanBrand";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -187,6 +191,8 @@ export const listen: Effect.Effect<
   const { primaryBackendStartup, quitting } = yield* DesktopState.DesktopState;
   const updates = yield* DesktopUpdates.DesktopUpdates;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
+  const isFork = isYouHanHanCodeVersion(environment.appVersion);
+  const releasesUrl = isFork ? `${YOUHANHAN_CODE_REPOSITORY_URL}/releases` : RELEASES_URL;
   const electronApp = yield* ElectronApp.ElectronApp;
   const electronShell = yield* ElectronShell.ElectronShell;
   const electronTheme = yield* ElectronTheme.ElectronTheme;
@@ -216,7 +222,9 @@ export const listen: Effect.Effect<
     Effect.map(([state, failure]) =>
       resolveStartupRecoveryOffer(
         state,
-        lastStartedVersion,
+        lastStartedVersion !== null && isYouHanHanCodeVersion(lastStartedVersion) === isFork
+          ? lastStartedVersion
+          : null,
         Option.exists(failure, ({ managedPolicy }) => managedPolicy),
       ),
     ),
@@ -257,11 +265,11 @@ export const listen: Effect.Effect<
       }
       case "reinstall":
         if (current._tag === "Reinstall") {
-          yield* electronShell.openExternal(`${RELEASES_URL}/tag/v${current.version}`);
+          yield* electronShell.openExternal(`${releasesUrl}/tag/v${current.version}`);
         }
         return;
       case "releases":
-        yield* electronShell.openExternal(RELEASES_URL);
+        yield* electronShell.openExternal(releasesUrl);
         return;
       case "copy": {
         const failure = yield* Ref.get(failureRef);

@@ -333,10 +333,7 @@ function useGate(environment: EnvironmentPresentation) {
   };
   const turnOn = async () => {
     setConnecting(true);
-    const ok = await controller.reconcileCloudState({
-      managedTunnel: true,
-      publish: controller.publishAgentActivity,
-    });
+    const ok = await controller.reconcileCloudState({ managedTunnel: true });
     if (!ok) setConnecting(false);
   };
   // A cached link state can name a tunnel on a disconnected machine; checking it would fail and

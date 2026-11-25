@@ -308,13 +308,11 @@ export const checkCloudReachability: (input: {
 
 export const updateCloudPreferences: (input: {
   readonly target: CloudLinkTarget;
-  readonly publishAgentActivity: boolean;
   readonly holdWebhooksWhileOffline?: boolean;
 }) => Effect.Effect<CloudLinkState, CloudEnvironmentLinkError, CloudLinkServices> = Effect.fn(
   "linkEnvironment.updateCloudPreferences",
 )(function* (input: {
   readonly target: CloudLinkTarget;
-  readonly publishAgentActivity: boolean;
   readonly holdWebhooksWhileOffline?: boolean;
 }) {
   const { target, ...payload } = input;
@@ -323,7 +321,8 @@ export const updateCloudPreferences: (input: {
     {
       method: "POST",
       url: (urls) => urls.preferences(),
-      request: ({ client, headers }) => client.preferences({ headers, payload }),
+      request: ({ client, headers }) =>
+        client.preferences({ headers, payload: { ...payload, publishAgentActivity: false } }),
     },
     {
       message: msg("Could not update environment cloud preferences."),
@@ -378,14 +377,9 @@ export const unlinkEnvironmentFromCloud: (input: {
   }
 });
 
-export type CloudLinkMode = "managed" | "publish_only";
-
-const PUBLISH_ONLY_PROVIDER_KIND = "manual" satisfies RelayManagedEndpointProviderKind;
-
 export const linkEnvironmentToCloud: (input: {
   readonly target: CloudLinkTarget;
   readonly clerkToken: string;
-  readonly mode?: CloudLinkMode;
 }) => Effect.Effect<
   void,
   CloudEnvironmentLinkError,
@@ -393,7 +387,6 @@ export const linkEnvironmentToCloud: (input: {
 > = Effect.fn("linkEnvironment.linkEnvironmentToCloud")(function* (input: {
   readonly target: CloudLinkTarget;
   readonly clerkToken: string;
-  readonly mode?: CloudLinkMode;
 }) {
   const configuredRelayUrl = relayUrl();
   if (!configuredRelayUrl) {
@@ -401,24 +394,19 @@ export const linkEnvironmentToCloud: (input: {
       message: m(msg("{name} is not configured.", { name: "T3CODE_RELAY_URL" })),
     });
   }
-  const managedTunnelsEnabled = (input.mode ?? "managed") === "managed";
-  const providerKind = managedTunnelsEnabled
-    ? MANAGED_ENDPOINT_PROVIDER_KIND
-    : PUBLISH_ONLY_PROVIDER_KIND;
+  const providerKind = MANAGED_ENDPOINT_PROVIDER_KIND;
   const relayClient = yield* ManagedRelay.ManagedRelayClient;
   // The environment only signs a proof for the loopback origin this request reaches it on.
   const endpoint = yield* preparedEndpoint(input.target);
-  if (managedTunnelsEnabled) {
-    yield* ensureRelayClientAvailable(input.target.environmentId);
-  }
+  yield* ensureRelayClientAvailable(input.target.environmentId);
 
   const challenge = yield* relayClient
     .createEnvironmentLinkChallenge({
       clerkToken: input.clerkToken,
       payload: {
-        notificationsEnabled: true,
-        liveActivitiesEnabled: true,
-        managedTunnelsEnabled,
+        notificationsEnabled: false,
+        liveActivitiesEnabled: false,
+        managedTunnelsEnabled: true,
       },
     })
     .pipe(
@@ -458,9 +446,9 @@ export const linkEnvironmentToCloud: (input: {
       clerkToken: input.clerkToken,
       payload: {
         proof,
-        notificationsEnabled: true,
-        liveActivitiesEnabled: true,
-        managedTunnelsEnabled,
+        notificationsEnabled: false,
+        liveActivitiesEnabled: false,
+        managedTunnelsEnabled: true,
       },
     })
     .pipe(

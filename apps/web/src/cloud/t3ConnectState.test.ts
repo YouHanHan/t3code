@@ -25,54 +25,35 @@ describe("cloudChangeReplacesLink", () => {
       name: "linking a tunnel",
       state: { linked: false, tunnel: false },
       tunnel: true,
-      publish: false,
-      expected: true,
-    },
-    {
-      name: "linking publish-only",
-      state: { linked: false, tunnel: false },
-      tunnel: false,
-      publish: true,
       expected: true,
     },
     {
       name: "repairing a revoked link",
       state: { linked: true, tunnel: true, revoked: true },
       tunnel: true,
-      publish: true,
-      expected: true,
-    },
-    {
-      name: "dropping the tunnel but keeping publish",
-      state: { linked: true, tunnel: true },
-      tunnel: false,
-      publish: true,
       expected: true,
     },
     {
       name: "adding a tunnel to a publish-only link",
       state: { linked: true, tunnel: false },
       tunnel: true,
-      publish: true,
       expected: true,
     },
     {
       name: "unlinking",
       state: { linked: true, tunnel: true },
       tunnel: false,
-      publish: false,
       expected: false,
     },
     {
-      name: "toggling publish on a tunnel link",
+      name: "updating preferences for an active tunnel",
       state: { linked: true, tunnel: true },
       tunnel: true,
-      publish: false,
       expected: false,
     },
-  ])("$name → $expected", ({ state, tunnel, publish, expected }) => {
-    expect(
-      cloudChangeReplacesLink(linkState(state), undefined, { managedTunnel: tunnel, publish }),
-    ).toBe(expected);
+  ])("$name → $expected", ({ state, tunnel, expected }) => {
+    expect(cloudChangeReplacesLink(linkState(state), undefined, { managedTunnel: tunnel })).toBe(
+      expected,
+    );
   });
 });

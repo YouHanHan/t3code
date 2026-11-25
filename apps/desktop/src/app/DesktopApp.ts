@@ -337,7 +337,7 @@ const bootstrap = Effect.fn("desktop.bootstrap")(function* (backendStarted: bool
 
   if (!settings.localEnvironmentEnabled) {
     // The backend config refreshes the launcher when the local environment runs; an update may move the app.
-    yield* DesktopCliShim.install;
+    yield* DesktopCliShim.installOnStartup;
     if (!(yield* Ref.get(state.quitting))) {
       yield* desktopWindow.createMainIfBackendReady;
     }

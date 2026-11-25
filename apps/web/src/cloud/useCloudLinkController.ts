@@ -36,7 +36,6 @@ import { cloudChangeReplacesLink, isManagedTunnelActive } from "./t3ConnectState
 
 export interface CloudLinkDesiredState {
   readonly managedTunnel: boolean;
-  readonly publish: boolean;
   readonly holdWebhooksWhileOffline?: boolean;
 }
 
@@ -106,7 +105,6 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
   const managedTunnelActive = linkData ? isManagedTunnelActive(linkData, relayProviderKind) : false;
   const managedTunnelOutOfSync =
     linkData !== null && !managedTunnelActive && isManagedTunnelActive(linkData, undefined);
-  const publishAgentActivity = cloudLinkState.data?.publishAgentActivity ?? false;
   const holdWebhooksWhileOffline = cloudLinkState.data?.holdWebhooksWhileOffline ?? false;
   const linked = !linkRevoked && (cloudLinkState.data?.linked ?? false);
   const canConfigureRelay = useEnvironmentCanConfigureRelay(environmentId);
@@ -148,7 +146,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
       return state;
     };
     if (!canManageLink()) return false;
-    const wantsLink = desired.managedTunnel || desired.publish;
+    const wantsLink = desired.managedTunnel;
     if (wantsLink && readLinkState() === null) return false;
     const tokenResult = await settlePromise(() => getToken(resolveRelayClerkTokenOptions()));
     if (!canManageLink()) return false;
@@ -206,7 +204,6 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
         const linkResult = await linkEnvironment({
           target,
           clerkToken,
-          mode: desired.managedTunnel ? "managed" : "publish_only",
         });
         // Any link attempt can change the account's tunnel count.
         refreshManagedTunnelUsage();
@@ -228,7 +225,6 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
       }
       const prefResult = await updateEnvironmentPreferences({
         target,
-        publishAgentActivity: desired.publish,
         ...(desired.holdWebhooksWhileOffline === undefined
           ? {}
           : { holdWebhooksWhileOffline: desired.holdWebhooksWhileOffline }),
@@ -258,7 +254,6 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
     linkRevoked,
     managedTunnelActive,
     managedTunnelOutOfSync,
-    publishAgentActivity,
     holdWebhooksWhileOffline,
     operationError,
     tunnelLimit,

@@ -91,6 +91,10 @@
       "types": "./src/releaseResource.ts",
       "import": "./src/releaseResource.ts"
     },
+    "./youHanHanBrand": {
+      "types": "./src/youHanHanBrand.ts",
+      "import": "./src/youHanHanBrand.ts"
+    },
     "./observability": {
       "types": "./src/observability.ts",
       "import": "./src/observability.ts"

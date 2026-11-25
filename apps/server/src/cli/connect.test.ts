@@ -69,22 +69,19 @@ it.effect("does not install the relay client when the user declines the managed 
 it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))(
   "t3 connect next steps",
   (it) => {
-    it.effect.each([
-      { subcommand: "status", hint: "connect link" },
-      { subcommand: "publish", hint: "connect login" },
-    ])("t3 connect $subcommand names `t3 $hint` with --base-dir", ({ subcommand, hint }) =>
+    it.effect("t3 connect status names `t3 connect link` with --base-dir", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-connect-hint-test-" });
 
         yield* Command.runWith(makeCli({ cloudEnabled: true }), { version: "0.0.0" })([
           "connect",
-          subcommand,
+          "status",
           "--base-dir",
           baseDir,
         ]);
 
-        const { command } = yield* resolveHostCliCommand(hint, ["--base-dir", baseDir]);
+        const { command } = yield* resolveHostCliCommand("connect link", ["--base-dir", baseDir]);
         assert.include((yield* TestConsole.logLines).join("\n"), `\`${command}\``);
       }).pipe(
         Effect.scoped,
@@ -96,6 +93,15 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
           ),
         ),
       ),
+    );
+
+    it.effect("t3 connect publish refuses to enable activity uploads", () =>
+      Effect.gen(function* () {
+        const error = yield* Command.runWith(makeCli({ cloudEnabled: true }), { version: "0.0.0" })(
+          ["connect", "publish"],
+        ).pipe(Effect.flip);
+        assert.propertyVal(error, "_tag", "AgentActivityPublishingDisabledError");
+      }),
     );
   },
 );
@@ -262,7 +268,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
           linkMode: "publish_only",
         });
 
-        assert.include(printed, "Exposure: publish-only");
+        assert.include(printed, "Exposure: disabled");
+        assert.include(printed, "Activity publishing is disabled");
         assert.notInclude(printed, "Other devices can reach this machine");
       }),
     );

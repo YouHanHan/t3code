@@ -25,13 +25,13 @@ export function isManagedTunnelActive(
 export function cloudChangeReplacesLink(
   linkState: EnvironmentCloudLinkStateResult,
   relayProviderKind: RelayManagedEndpointProviderKind | undefined,
-  desired: { readonly managedTunnel: boolean; readonly publish: boolean },
+  desired: { readonly managedTunnel: boolean },
 ) {
   return (
-    (desired.managedTunnel || desired.publish) &&
+    desired.managedTunnel &&
     (!linkState.linked ||
       linkState.linkRevoked === true ||
-      isManagedTunnelActive(linkState, relayProviderKind) !== desired.managedTunnel)
+      !isManagedTunnelActive(linkState, relayProviderKind))
   );
 }
 

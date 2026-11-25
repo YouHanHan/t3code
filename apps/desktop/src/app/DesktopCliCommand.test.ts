@@ -15,12 +15,19 @@ import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 
 const environmentFor = (
   path: Path.Path,
-  input: { home: string; baseDir: string; platform?: NodeJS.Platform; isPackaged?: boolean },
+  input: {
+    home: string;
+    baseDir: string;
+    platform?: NodeJS.Platform;
+    isPackaged?: boolean;
+    appVersion?: string;
+  },
 ) =>
   DesktopEnvironment.DesktopEnvironment.of({
     path,
     platform: input.platform ?? "linux",
     isPackaged: input.isPackaged ?? true,
+    appVersion: input.appVersion ?? "0.1.12",
     homeDirectory: input.home,
     baseDir: input.baseDir,
     stateDir: path.join(input.baseDir, "userdata"),
@@ -35,6 +42,7 @@ const commandIn = (
     baseDir?: string;
     platform?: NodeJS.Platform;
     isPackaged?: boolean;
+    appVersion?: string;
     env?: NodeJS.ProcessEnv;
   },
   spawner?: ChildProcessSpawner.ChildProcessSpawner["Service"],
@@ -441,6 +449,34 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
       yield* (yield* commandIn({ home: besideHome, platform: "win32" }, beside.spawner))
         .installOnFirstLaunch;
       expect(beside.registry).toMatchObject({ path: "C:\\Tools", writes: 0 });
+    }),
+  );
+
+  it.effect("leaves the existing Windows PATH and launcher in place when the fork starts", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fs.makeTempDirectoryScoped();
+      const baseDir = path.join(home, ".t3");
+      const input = { home, baseDir, platform: "win32", appVersion: "0.1.12-youhanhan.1" } as const;
+      const environment = environmentFor(path, input);
+      const launcher = DesktopCliShim.launcherPath(environment);
+      const existing = `@rem ${DesktopCliShim.MARKER}\r\n`;
+      yield* fs.makeDirectory(path.dirname(launcher), { recursive: true });
+      yield* fs.writeFileString(launcher, existing);
+
+      const { registry, spawner } = fakePowerShell(path.dirname(launcher));
+      yield* (yield* commandIn(input, spawner)).installOnFirstLaunch;
+      const startupLauncher = yield* DesktopCliShim.installOnStartup.pipe(
+        Effect.provideService(DesktopEnvironment.DesktopEnvironment, environment),
+      );
+
+      expect(registry.writes).toBe(0);
+      expect(yield* fs.readFileString(launcher)).toBe(existing);
+      expect(yield* fs.exists(path.join(environment.stateDir, "cli-command-first-launch"))).toBe(
+        false,
+      );
+      expect(Option.isNone(startupLauncher)).toBe(true);
     }),
   );
 });

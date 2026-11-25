@@ -189,6 +189,18 @@ function useNotificationsReady(): boolean {
 
 export function SettingsNotificationsRouteScreen() {
   const gt = useGT();
+  if (!supportsAgentAwarenessPush()) {
+    return (
+      <SettingsScreen title={gt("Notifications")}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerClassName="px-5 pt-4"
+        >
+          <Text className="text-base text-foreground-muted">{gt("Notifications unavailable")}</Text>
+        </ScrollView>
+      </SettingsScreen>
+    );
+  }
   if (!hasCloudPublicConfig()) {
     return (
       <SettingsScreen title={gt("Notifications")}>

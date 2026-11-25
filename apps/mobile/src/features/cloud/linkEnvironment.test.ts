@@ -90,7 +90,6 @@ function layerCloudClient() {
       MobileStorage.MobileStorage,
       MobileStorage.MobileStorage.of({
         loadOrCreateAgentAwarenessDeviceId: Effect.succeed("device-1"),
-        loadOrCreateAnalyticsDeviceId: Effect.succeed("analytics-device-1"),
         loadAgentAwarenessDeviceId: Effect.succeed("device-1"),
         loadAgentAwarenessRegistrationRecord: Effect.succeed(null),
         saveAgentAwarenessRegistrationRecord: () => Effect.void,
@@ -175,16 +174,6 @@ function validLinkResponse(environmentId = "env-1") {
   };
 }
 
-function linkStateResponse() {
-  return {
-    linked: false,
-    cloudUserId: null,
-    relayUrl: null,
-    relayIssuer: null,
-    publishAgentActivity: true,
-  };
-}
-
 function validLinkChallengeResponse() {
   return {
     challenge: "link-challenge",
@@ -234,9 +223,6 @@ describe("mobile cloud link environment client", () => {
     () =>
       Effect.gen(function* () {
         const fetchMock = vi.fn((url: string | URL) => {
-          if (String(url).endsWith("/api/connect/preferences")) {
-            return Promise.resolve(Response.json(linkStateResponse()));
-          }
           if (String(url).endsWith("/v1/client/environment-link-challenges")) {
             return Promise.resolve(Response.json(validLinkChallengeResponse()));
           }
@@ -252,16 +238,13 @@ describe("mobile cloud link environment client", () => {
           _tag: "CloudEnvironmentLinkError",
           message: "Relay returned credentials for a different environment.",
         });
-        expect(fetchMock).toHaveBeenCalledTimes(4);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
       }),
   );
 
   it.effect("rejects relay link credentials for a different managed endpoint provider", () =>
     Effect.gen(function* () {
       const fetchMock = vi.fn((url: string | URL) => {
-        if (String(url).endsWith("/api/connect/preferences")) {
-          return Promise.resolve(Response.json(linkStateResponse()));
-        }
         if (String(url).endsWith("/v1/client/environment-link-challenges")) {
           return Promise.resolve(Response.json(validLinkChallengeResponse()));
         }
@@ -285,11 +268,11 @@ describe("mobile cloud link environment client", () => {
         _tag: "CloudEnvironmentLinkError",
         message: "Relay returned credentials for a different endpoint provider.",
       });
-      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     }),
   );
 
-  it.effect("preserves disabled Live Activity preferences when linking an environment", () =>
+  it.effect("links with the device preference and leaves host publishing alone", () =>
     Effect.gen(function* () {
       const bodies: Array<unknown> = [];
       const fetchMock = vi.fn((url: string | URL, init?: RequestInit) => {
@@ -305,9 +288,6 @@ describe("mobile cloud link environment client", () => {
         if (String(url).endsWith("/v1/client/environment-links")) {
           return Promise.resolve(Response.json(validLinkResponse()));
         }
-        if (String(url).endsWith("/api/connect/preferences")) {
-          return Promise.resolve(Response.json(linkStateResponse()));
-        }
         return Promise.resolve(
           Response.json({ ok: true, endpointRuntimeStatus: { status: "configured" } }),
         );
@@ -316,8 +296,10 @@ describe("mobile cloud link environment client", () => {
 
       yield* linkPreparedEnvironment(false);
 
-      expect(bodies[0]).toEqual({ publishAgentActivity: true });
-      expect(bodies[2]).toMatchObject({
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/connect/preferences")),
+      ).toBe(false);
+      expect(bodies[1]).toMatchObject({
         endpoint: {
           httpBaseUrl: "https://desktop.example.test/",
           wsBaseUrl: "wss://desktop.example.test/ws",
@@ -328,13 +310,13 @@ describe("mobile cloud link environment client", () => {
           localHttpPort: 443,
         },
       });
-      expect(bodies[3]).toMatchObject({
+      expect(bodies[2]).toMatchObject({
         deviceId: "device-1",
         notificationsEnabled: true,
         liveActivitiesEnabled: false,
         managedTunnelsEnabled: false,
       });
-      expect(bodies[4]).toMatchObject({
+      expect(bodies[3]).toMatchObject({
         cloudUserId: "user_123",
         environmentCredential: "environment-credential",
       });

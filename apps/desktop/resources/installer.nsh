@@ -7,6 +7,7 @@
   !define T3StrRep '${StrRep}'
 !endif
 
+!if "${APP_ID}" != "io.github.youhanhan.code"
 !macro customAppRunningMessages
   Push $0
   Push $1
@@ -29,6 +30,7 @@
   Pop $1
   Pop $0
 !macroend
+!endif
 
 !macro customInstall
   !ifndef DO_NOT_CREATE_START_MENU_SHORTCUT

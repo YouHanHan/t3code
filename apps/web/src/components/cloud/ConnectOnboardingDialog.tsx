@@ -114,7 +114,6 @@ function ConfiguredConnectOnboardingDialog() {
   const [openForAccount, setOpenForAccount] = useState<string | null>(null);
   const [step, setStep] = useState<OnboardingStep>("devices");
   const [exposeEnvironment, setExposeEnvironment] = useState(true);
-  const [publishAgentActivity, setPublishAgentActivity] = useState(true);
   const [requireDeviceApproval, setRequireDeviceApproval] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
@@ -157,7 +156,6 @@ function ConfiguredConnectOnboardingDialog() {
       setRequestedAccount(null);
       setPrefilledFromLinkState(false);
       setExposeEnvironment(true);
-      setPublishAgentActivity(true);
       setRequireDeviceApproval(false);
       setDontShowAgain(false);
       setStep(canManageRelay && controller.linkState.target !== null ? "publish" : "devices");
@@ -174,7 +172,6 @@ function ConfiguredConnectOnboardingDialog() {
       linkStateData.cloudUserId === openForAccount
     ) {
       setExposeEnvironment(linkStateData.managedTunnelActive ?? linkStateData.linked);
-      setPublishAgentActivity(linkStateData.publishAgentActivity);
     }
   }
 
@@ -211,24 +208,19 @@ function ConfiguredConnectOnboardingDialog() {
       return;
     }
     if (linkStateData === null || controller.linkState.error !== null) return;
-    // Onboarding only enables links; both toggles off must preserve existing links.
-    if (!exposeEnvironment && !publishAgentActivity) {
+    // 跳过此步骤时保留现有连接。
+    if (!exposeEnvironment) {
       setStep("devices");
       return;
     }
     setIsApplying(true);
-    const ok = await controller.reconcileCloudState({
-      managedTunnel: exposeEnvironment,
-      publish: publishAgentActivity,
-    });
+    const ok = await controller.reconcileCloudState({ managedTunnel: true });
     setIsApplying(false);
     if (!ok) return;
     toastManager.add({
       type: "success",
       title: gt("T3 Connect enabled"),
-      description: exposeEnvironment
-        ? gt("This environment is available to your other devices through T3 Connect.")
-        : gt("This environment publishes agent activity to your mobile clients."),
+      description: gt("This environment is available to your other devices through T3 Connect."),
     });
     setStep("devices");
   };
@@ -276,7 +268,6 @@ function ConfiguredConnectOnboardingDialog() {
           {step === "publish" ? (
             <PublishStep
               exposeEnvironment={exposeEnvironment}
-              publishAgentActivity={publishAgentActivity}
               requireDeviceApproval={
                 canRequireDeviceApproval ? requireDeviceApproval || deviceApprovalRequired : null
               }
@@ -288,9 +279,6 @@ function ConfiguredConnectOnboardingDialog() {
               onOpenAccountPage={leaveForAccountPage}
               onExposeEnvironmentChange={(enabled) => {
                 if (canPublishOnEnvironment(primaryEnvironmentId)) setExposeEnvironment(enabled);
-              }}
-              onPublishAgentActivityChange={(enabled) => {
-                if (canPublishOnEnvironment(primaryEnvironmentId)) setPublishAgentActivity(enabled);
               }}
             />
           ) : (
@@ -340,7 +328,6 @@ const STEP_LABELS: Record<OnboardingStep, string> = {
 
 function PublishStep({
   exposeEnvironment,
-  publishAgentActivity,
   requireDeviceApproval,
   requireDeviceApprovalLocked,
   onRequireDeviceApprovalChange,
@@ -349,10 +336,8 @@ function PublishStep({
   tunnelLimit,
   onOpenAccountPage,
   onExposeEnvironmentChange,
-  onPublishAgentActivityChange,
 }: {
   readonly exposeEnvironment: boolean;
-  readonly publishAgentActivity: boolean;
   /** Null when this session cannot change who may connect. */
   readonly requireDeviceApproval: boolean | null;
   readonly requireDeviceApprovalLocked: boolean;
@@ -362,7 +347,6 @@ function PublishStep({
   readonly tunnelLimit: number | null;
   readonly onOpenAccountPage: ((page: T3ConnectAccountPageUrl) => void) | null;
   readonly onExposeEnvironmentChange: (enabled: boolean) => void;
-  readonly onPublishAgentActivityChange: (enabled: boolean) => void;
 }) {
   const gt = useGT();
   return (
@@ -376,15 +360,6 @@ function PublishStep({
           checked={exposeEnvironment}
           disabled={disabled}
           onCheckedChange={onExposeEnvironmentChange}
-        />
-        <OnboardingToggleRow
-          title={gt("Publish agent activity")}
-          description={gt(
-            "Send activity from this environment to your mobile clients for push notifications and Live Activities.",
-          )}
-          checked={publishAgentActivity}
-          disabled={disabled}
-          onCheckedChange={onPublishAgentActivityChange}
         />
         {requireDeviceApproval !== null ? (
           <OnboardingToggleRow

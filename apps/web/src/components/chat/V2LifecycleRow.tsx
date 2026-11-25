@@ -69,6 +69,7 @@ import { TimelineSystemDivider } from "./TimelineSystemDivider";
 import { subagentResumedSince } from "./V2LifecycleRow.logic";
 import { Button, InlineButton } from "../ui/button";
 import { T3Wordmark } from "../T3Wordmark";
+import { IS_YOUHANHAN_CODE } from "../../branding";
 
 export type { HandoffTimelineRun } from "@t3tools/client-runtime/handoff";
 
@@ -148,7 +149,13 @@ export function V2LifecycleRow(props: {
     return (
       <WorkLogRow
         data-v2-item-type={item.type}
-        icon={<T3Wordmark className="size-4 text-icon-muted" aria-hidden />}
+        icon={
+          IS_YOUHANHAN_CODE ? (
+            <MessageSquareIcon className="size-4 text-icon-muted" aria-hidden />
+          ) : (
+            <T3Wordmark className="size-4 text-icon-muted" aria-hidden />
+          )
+        }
         label={
           item.title ? (
             <T>

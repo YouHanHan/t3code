@@ -1024,18 +1024,14 @@ const RelayMetadataGroup = HttpApiGroup.make("metadata")
   )
   .annotate(OpenApi.Description, "OAuth and DPoP discovery metadata.");
 
-export const RelayRegisterDeviceEndpoint = HttpApiEndpoint.post(
-  "registerDevice",
-  "/v1/mobile/devices",
-  {
-    headers: RelayDpopRequestHeaders,
-    payload: RelayDeviceRegistrationRequest,
-    success: RelayOkResponse,
-    error: RelayAuthAndInternalErrors,
-  },
-).annotate(OpenApi.Summary, "Register or update a mobile device");
+const RelayRegisterDeviceEndpoint = HttpApiEndpoint.post("registerDevice", "/v1/mobile/devices", {
+  headers: RelayDpopRequestHeaders,
+  payload: RelayDeviceRegistrationRequest,
+  success: RelayOkResponse,
+  error: RelayAuthAndInternalErrors,
+}).annotate(OpenApi.Summary, "Register or update a mobile device");
 
-export const RelayRegisterLiveActivityEndpoint = HttpApiEndpoint.post(
+const RelayRegisterLiveActivityEndpoint = HttpApiEndpoint.post(
   "registerLiveActivity",
   "/v1/mobile/live-activities",
   {

@@ -1009,14 +1009,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("telemetry analytics usage data tracking legal opt out")],
   },
   {
-    id: "telemetry-export",
-    title: msg("OpenTelemetry export"),
-    to: "/settings/diagnostics",
-    targetId: "telemetry-export",
-    scope: "environment",
-    searchTerms: [msg("OTel OTLP telemetry export endpoints logs traces metrics Grafana")],
-  },
-  {
     id: "diagnostics",
     title: msg("Diagnostics"),
     to: "/settings/maintenance",
@@ -1443,15 +1435,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("webhook automations offline queue mailbox t3 connect")],
     cloudOnly: true,
     managedTunnelOnly: true,
-  },
-  {
-    id: "publish-agent-activity",
-    localEnvironmentOnly: true,
-    title: msg("Publish agent activity"),
-    to: "/settings/access",
-    targetId: "connections-environment",
-    searchTerms: [msg("mobile push notifications live activities cloud tunnel")],
-    cloudOnly: true,
   },
   {
     id: "preview-tunnel",

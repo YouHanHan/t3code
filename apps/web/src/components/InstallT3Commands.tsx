@@ -1,5 +1,6 @@
 import { T } from "gt-react";
 import { cn } from "~/lib/utils";
+import { IS_YOUHANHAN_CODE } from "../branding";
 
 import { CommandBlock } from "./CommandBlock";
 
@@ -14,6 +15,13 @@ export function InstallT3Commands({
   readonly command: string;
   readonly className?: string;
 }) {
+  if (IS_YOUHANHAN_CODE) {
+    return (
+      <div className={className}>
+        <CommandBlock command={command} />
+      </div>
+    );
+  }
   return (
     <div className={cn("space-y-2", className)}>
       <p className="text-xs text-muted-foreground">macOS, Linux</p>
